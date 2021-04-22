@@ -22,11 +22,15 @@ object RunLSA {
     val k = if (args.length > 0) args(0).toInt else 100
     val numTerms = if (args.length > 1) args(1).toInt else 20000
 
-    val spark = SparkSession.builder().config("spark.serializer", classOf[KryoSerializer].getName).getOrCreate()
+    val spark = SparkSession.builder().config("spark.serializer", classOf[KryoSerializer].getName)
+      .config("spark.master", "local")
+      .getOrCreate()
     val assembleMatrix = new AssembleDocumentTermMatrix(spark)
     import assembleMatrix._
 
     val docTexts: Dataset[(String, String)] = parseWikipediaDump("hdfs:///user/ds/Wikipedia/")
+
+    docTexts.show()
 
     val (docTermMatrix, termIds, docIds, termIdfs) = documentTermMatrix(docTexts, "stopwords.txt", numTerms)
 
@@ -38,7 +42,7 @@ object RunLSA {
 
     vecRdd.cache()
     val mat = new RowMatrix(vecRdd)
-    val svd = mat.computeSVD(k, computeU=true)
+    val svd = mat.computeSVD(k, computeU = true)
 
     println("Singular values: " + svd.s)
     val topConceptTerms = topTermsInTopConcepts(svd, 10, 10, termIds)
@@ -68,14 +72,14 @@ object RunLSA {
    * The top concepts are the concepts that explain the most variance in the dataset.
    * For each top concept, finds the terms that are most relevant to the concept.
    *
-   * @param svd A singular value decomposition.
+   * @param svd         A singular value decomposition.
    * @param numConcepts The number of concepts to look at.
-   * @param numTerms The number of terms to look at within each concept.
-   * @param termIds The mapping of term IDs to terms.
+   * @param numTerms    The number of terms to look at within each concept.
+   * @param termIds     The mapping of term IDs to terms.
    * @return A Seq of top concepts, in order, each with a Seq of top terms, in order.
    */
   def topTermsInTopConcepts(svd: SingularValueDecomposition[RowMatrix, Matrix], numConcepts: Int,
-      numTerms: Int, termIds: Array[String]): Seq[Seq[(String, Double)]] = {
+                            numTerms: Int, termIds: Array[String]): Seq[Seq[(String, Double)]] = {
     val v = svd.V
     val topTerms = new ArrayBuffer[Seq[(String, Double)]]()
     val arr = v.toArray
@@ -83,7 +87,7 @@ object RunLSA {
       val offs = i * v.numRows
       val termWeights = arr.slice(offs, offs + v.numRows).zipWithIndex
       val sorted = termWeights.sortBy(-_._1)
-      topTerms += sorted.take(numTerms).map {case (score, id) => (termIds(id), score) }
+      topTerms += sorted.take(numTerms).map { case (score, id) => (termIds(id), score) }
     }
     topTerms
   }
@@ -92,15 +96,15 @@ object RunLSA {
    * The top concepts are the concepts that explain the most variance in the dataset.
    * For each top concept, finds the documents that are most relevant to the concept.
    *
-   * @param svd A singular value decomposition.
+   * @param svd         A singular value decomposition.
    * @param numConcepts The number of concepts to look at.
-   * @param numDocs The number of documents to look at within each concept.
-   * @param docIds The mapping of document IDs to terms.
+   * @param numDocs     The number of documents to look at within each concept.
+   * @param docIds      The mapping of document IDs to terms.
    * @return A Seq of top concepts, in order, each with a Seq of top terms, in order.
    */
   def topDocsInTopConcepts(svd: SingularValueDecomposition[RowMatrix, Matrix], numConcepts: Int,
-      numDocs: Int, docIds: Map[Long, String]): Seq[Seq[(String, Double)]] = {
-    val u  = svd.U
+                           numDocs: Int, docIds: Map[Long, String]): Seq[Seq[(String, Double)]] = {
+    val u = svd.U
     val topDocs = new ArrayBuffer[Seq[(String, Double)]]()
     for (i <- 0 until numConcepts) {
       val docWeights = u.rows.map(_.toArray(i)).zipWithUniqueId
@@ -111,10 +115,10 @@ object RunLSA {
 }
 
 class LSAQueryEngine(
-    val svd: SingularValueDecomposition[RowMatrix, Matrix],
-    val termIds: Array[String],
-    val docIds: Map[Long, String],
-    val termIdfs: Array[Double]) {
+                      val svd: SingularValueDecomposition[RowMatrix, Matrix],
+                      val termIds: Array[String],
+                      val docIds: Map[Long, String],
+                      val termIdfs: Array[Double]) {
 
   val VS: BDenseMatrix[Double] = multiplyByDiagonalMatrix(svd.V, svd.s)
   val normalizedVS: BDenseMatrix[Double] = rowsNormalized(VS)
@@ -220,8 +224,8 @@ class LSAQueryEngine(
   }
 
   /**
-    * Builds a term query vector from a set of terms.
-    */
+   * Builds a term query vector from a set of terms.
+   */
   def termsToQueryVector(terms: Seq[String]): BSparseVector[Double] = {
     val indices = terms.map(idTerms(_)).toArray
     val values = indices.map(termIdfs(_))
@@ -229,9 +233,9 @@ class LSAQueryEngine(
   }
 
   /**
-    * Finds docs relevant to a term query, represented as a vector with non-zero weights for the
-    * terms in the query.
-    */
+   * Finds docs relevant to a term query, represented as a vector with non-zero weights for the
+   * terms in the query.
+   */
   def topDocsForTermQuery(query: BSparseVector[Double]): Seq[(Double, Long)] = {
     val breezeV = new BDenseMatrix[Double](svd.V.numRows, svd.V.numCols, svd.V.toArray)
     val termRowArr = (breezeV.t * query).toArray
