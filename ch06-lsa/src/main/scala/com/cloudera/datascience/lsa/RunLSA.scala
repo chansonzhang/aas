@@ -30,8 +30,6 @@ object RunLSA {
 
     val docTexts: Dataset[(String, String)] = parseWikipediaDump("hdfs:///user/ds/Wikipedia/")
 
-    docTexts.show()
-
     val (docTermMatrix, termIds, docIds, termIdfs) = documentTermMatrix(docTexts, "stopwords.txt", numTerms)
 
     docTermMatrix.cache()

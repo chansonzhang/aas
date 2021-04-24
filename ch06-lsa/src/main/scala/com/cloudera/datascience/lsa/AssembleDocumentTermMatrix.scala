@@ -23,6 +23,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serializable {
+
   import spark.implicits._
 
   /**
@@ -38,7 +39,7 @@ class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serial
 
     WikipediaPage.readPage(page, hackedPageXml)
     if (page.isEmpty || !page.isArticle || page.isRedirect || page.isDisambiguation ||
-        page.getTitle.contains("(disambiguation)")) {
+      page.getTitle.contains("(disambiguation)")) {
       None
     } else {
       Some((page.getTitle, page.getContent))
@@ -51,12 +52,8 @@ class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serial
     conf.set(XMLInputFormat.END_TAG_KEY, "</page>")
     val kvs = spark.sparkContext.newAPIHadoopFile(path, classOf[XMLInputFormat], classOf[LongWritable],
       classOf[Text], conf)
-    val first=kvs.take(100)
     val rawXmls = kvs.map(_._2.toString).toDS()
-    val x = rawXmls.take(100)
 
-    println("rawXmls:")
-    rawXmls.show()
     rawXmls.filter(_ != null).flatMap(wikiXmlToPlainText)
   }
 
@@ -74,7 +71,7 @@ class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serial
   }
 
   def plainTextToLemmas(text: String, stopWords: Set[String], pipeline: StanfordCoreNLP)
-    : Seq[String] = {
+  : Seq[String] = {
     val doc = new Annotation(text)
     pipeline.annotate(doc)
     val lemmas = new ArrayBuffer[String]()
@@ -110,7 +107,7 @@ class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serial
    * @param docTexts a DF with two columns: title and text
    */
   def documentTermMatrix(docTexts: Dataset[(String, String)], stopWordsFile: String, numTerms: Int)
-    : (DataFrame, Array[String], Map[Long, String], Array[Double]) = {
+  : (DataFrame, Array[String], Map[Long, String], Array[Double]) = {
     val terms = contentsToTerms(docTexts, stopWordsFile)
 
     val termsDF = terms.toDF("title", "terms")
