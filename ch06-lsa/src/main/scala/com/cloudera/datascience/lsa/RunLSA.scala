@@ -249,16 +249,31 @@ class LSAQueryEngine(
   }
 
   def printTopTermsForTerm(term: String): Unit = {
+    val termId = idTerms.get(term)
+    if (termId.isEmpty) {
+      println("term " + term + " not found, skip...")
+      return
+    }
     val idWeights = topTermsForTerm(idTerms(term))
     println(idWeights.map { case (score, id) => (termIds(id), score) }.mkString(", "))
   }
 
   def printTopDocsForDoc(doc: String): Unit = {
+    val docId = idDocs.get(doc)
+    if (docId.isEmpty) {
+      println("doc " + doc + " not found, skip...")
+      return
+    }
     val idWeights = topDocsForDoc(idDocs(doc))
     println(idWeights.map { case (score, id) => (docIds(id), score) }.mkString(", "))
   }
 
   def printTopDocsForTerm(term: String): Unit = {
+    val termId = idTerms.get(term)
+    if (termId.isEmpty) {
+      println("term " + term + " not found, skip...")
+      return
+    }
     val idWeights = topDocsForTerm(idTerms(term))
     println(idWeights.map { case (score, id) => (docIds(id), score) }.mkString(", "))
   }

@@ -87,6 +87,8 @@ class AssembleDocumentTermMatrix(private val spark: SparkSession) extends Serial
   }
 
   def contentsToTerms(docs: Dataset[(String, String)], stopWordsFile: String): Dataset[(String, Seq[String])] = {
+    val localDir = System.getProperty("user.dir")
+    println("localDir: ", localDir)
     val stopWords = scala.io.Source.fromFile(stopWordsFile).getLines().toSet
     val bStopWords = spark.sparkContext.broadcast(stopWords)
 
